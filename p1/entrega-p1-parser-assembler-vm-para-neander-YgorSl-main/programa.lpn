@@ -1,0 +1,12 @@
+PROGRAMA "teste":
+INICIO
+VAR RES
+VAR A
+VAR B
+VAR C
+VAR X
+A = 2
+B = 3
+C = 1
+X = C + A * B
+FIM
