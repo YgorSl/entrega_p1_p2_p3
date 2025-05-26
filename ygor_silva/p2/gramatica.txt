@@ -1,0 +1,46 @@
+<program> ::= <statement_list>
+
+<statement_list> ::= <statement> | <statement> <statement_list>
+
+<statement> ::= <variable_declaration> ";"
+              | <assignment> ";"
+              | <if_statement>
+              | <while_statement>
+              | <function_definition>
+              | <function_call> ";"
+              | "return" <expression> ";"
+
+<variable_declaration> ::= "var" <identifier> ["=" <expression>]
+
+<assignment> ::= <identifier> "=" <expression>
+
+<if_statement> ::= "if" "(" <expression> ")" "{" <statement_list> "}"
+                  ["else" "{" <statement_list> "}"]
+
+<while_statement> ::= "while" "(" <expression> ")" "{" <statement_list> "}"
+
+<function_definition> ::= "function" <identifier> "(" [<parameter_list>] ")" "{" <statement_list> "}"
+
+<parameter_list> ::= <identifier> | <identifier> "," <parameter_list>
+
+<function_call> ::= <identifier> "(" [<argument_list>] ")"
+
+<argument_list> ::= <expression> | <expression> "," <argument_list>
+
+<expression> ::= <term> | <term> <add_op> <expression>
+
+<term> ::= <factor> | <factor> <mul_op> <term>
+
+<factor> ::= <number> | <identifier> | "(" <expression> ")" | <function_call>
+
+<add_op> ::= "+" | "-"
+
+<mul_op> ::= "*" | "/"
+
+<identifier> ::= letter {letter | digit}
+
+<number> ::= digit {digit}
+
+<letter> ::= "a" | ... | "z" | "A" | ... | "Z"
+
+<digit> ::= "0" | "1" | ... | "9"

@@ -1,0 +1,17 @@
+var x = 10;
+var y = 5;
+
+function soma(a, b) {
+    var resultado = a + b;
+    return resultado;
+}
+
+x = soma(x, y);
+
+while (x > 0) {
+    if (x % 2 == 0) {
+        x = x - 1;
+    } else {
+        x = x - 2;
+    }
+}

@@ -51,7 +51,7 @@ Qualquer erro de sintaxe na expressão é relatado em stderr.
 
 Limitações conhecidas
 
-O parser suporta +, -, *, / e parênteses.(Pode ocorrer bugs ao tentar fazer divisão)
+O parser suporta +, -, *,
 
 Apenas inteiros positivos são aceitos.
 

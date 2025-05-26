@@ -1,123 +1,155 @@
-// compilador_bf.c — gera Brainfuck puro em stdout a partir de nome="expr"
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
 #include <string.h>
 
-const char *p;
-int expr(), term(), factor();
+#define MAX_INPUT_LINE 1024
+#define MAX_TERMS 100
 
-// parser recursivo: +, -, *, / e parênteses
-int expr() {
-    int v = term();
-    while (*p=='+'||*p=='-') {
-        char op = *p++;
-        int v2 = term();
-        v = (op=='+') ? v+v2 : v-v2;
-    }
-    return v;
-}
+typedef struct {
+    int sign;              // +1 for positive, 0 for negative
+    int is_multiplication; // 1 for A*B term, 0 for single value
+    int multiplier;
+    int multiplicand;
+    int value;
+} ExpressionTerm;
 
-int term() {
-    int v = factor();
-    while (*p=='*'||*p=='/') {
-        char op = *p++;
-        int v2 = factor();
-        v = (op=='*') ? v*v2 : v/v2;
-    }
-    return v;
-}
-
-int factor() {
-    if (*p=='(') {
-        p++;
-        int v = expr();
-        if (*p==')') p++;
-        return v;
-    }
-    if (!isdigit(*p)) {
-        fprintf(stderr, "Erro de sintaxe em \"%s\"\n", p);
-        exit(1);
-    }
-    int v = 0;
-    while (isdigit(*p)) {
-        v = v*10 + (*p - '0');
-        p++;
-    }
-    return v;
-}
-
-// escreve em stdout o Brainfuck para imprimir byte 'c' na célula target_cell
-void bf_print_byte(int *cur_cell, int target_cell, unsigned char c) {
-    int delta = target_cell - *cur_cell;
-    if (delta > 0) {
-        for (int i = 0; i < delta; i++) putchar('>');
-    } else {
-        for (int i = 0; i < -delta; i++) putchar('<');
-    }
-    *cur_cell = target_cell;
-    // zera e seta
-    fputs("[-]", stdout);
-    for (int i = 0; i < c; i++) putchar('+');
-    // imprime
-    putchar('.');
-}
-
-// imprime string UTF-8 byte a byte
-void bf_print_string(int *cur_cell, const char *s) {
-    int cell = 0;
-    for (size_t i = 0; i < strlen(s); ++i) {
-        bf_print_byte(cur_cell, cell++, (unsigned char)s[i]);
-    }
-}
-
-int main(int argc, char **argv) {
-    char buffer[256];
-
-    // lê de argv ou stdin
-    if (argc == 2) {
-        strncpy(buffer, argv[1], sizeof(buffer)-1);
-        buffer[sizeof(buffer)-1] = '\0';
-    } else {
-        if (!fgets(buffer, sizeof(buffer), stdin)) {
-            return 0;
+// Removes all whitespace
+void remove_whitespace(char *str) {
+    char *src = str, *dst = str;
+    while (*src) {
+        if (!isspace((unsigned char)*src)) {
+            *dst++ = *src;
         }
-        buffer[strcspn(buffer, "\r\n")] = '\0';
+        src++;
+    }
+    *dst = '\0';
+}
+
+int main() {
+    char input_line[MAX_INPUT_LINE];
+    if (!fgets(input_line, sizeof(input_line), stdin)) {
+        return 0;
     }
 
-    // separa nome e expressão
-    char *eq = strchr(buffer, '=');
-    if (!eq) {
-        fprintf(stderr, "Formato inválido: nome=expr\n");
-        return 1;
+    // Remove newline
+    char *newline = strchr(input_line, '\n');
+    if (newline) *newline = '\0';
+
+    // Split by '='
+    char *equals = strchr(input_line, '=');
+    if (!equals) return 1;
+
+    int var_name_len = equals - input_line;
+    char variable_name[MAX_INPUT_LINE];
+    strncpy(variable_name, input_line, var_name_len);
+    variable_name[var_name_len] = '\0';
+    remove_whitespace(variable_name);
+
+    char expression[MAX_INPUT_LINE];
+    strcpy(expression, equals + 1);
+    remove_whitespace(expression);
+
+    // Parse expression
+    ExpressionTerm terms[MAX_TERMS];
+    int term_count = 0;
+    char *pos = expression;
+    int current_sign = 1;
+
+    while (*pos && term_count < MAX_TERMS) {
+        if (*pos == '+') { current_sign = 1; pos++; continue; }
+        if (*pos == '-') { current_sign = 0; pos++; continue; }
+
+        char term_str[MAX_INPUT_LINE];
+        char *end = pos;
+        while (*end && *end != '+' && *end != '-') end++;
+        int len = end - pos;
+        strncpy(term_str, pos, len);
+        term_str[len] = '\0';
+        remove_whitespace(term_str);
+
+        char *mult = strchr(term_str, '*');
+        if (mult) {
+            *mult = '\0';
+            char left[MAX_INPUT_LINE], right[MAX_INPUT_LINE];
+            strcpy(left, term_str);
+            strcpy(right, mult + 1);
+            remove_whitespace(left);
+            remove_whitespace(right);
+
+            terms[term_count].sign = current_sign;
+            terms[term_count].is_multiplication = 1;
+            terms[term_count].multiplier = atoi(left);
+            terms[term_count].multiplicand = atoi(right);
+        } else {
+            terms[term_count].sign = current_sign;
+            terms[term_count].is_multiplication = 0;
+            terms[term_count].value = atoi(term_str);
+        }
+        term_count++;
+        pos = end;
     }
-    // nome da variável
-    char varname[128];
-    int n = eq - buffer;
-    if (n >= (int)sizeof(varname)) n = sizeof(varname)-1;
-    strncpy(varname, buffer, n);
-    varname[n] = '\0';
 
-    // início da expressão
-    char *expr_start = eq + 1;
-    if (*expr_start == '"') {
-        expr_start++;
-        char *endq = strrchr(expr_start, '"');
-        if (endq) *endq = '\0';
+    // Print variable name in UTF-8 (byte by byte)
+    for (size_t i = 0; i < strlen(variable_name); i++) {
+        unsigned char c = (unsigned char)variable_name[i];
+        printf(">");
+        for (int j = 0; j < c; j++) printf("+");
+        printf(".");
+        printf("[-]");  // clear cell after printing
     }
 
-    // avalia
-    p = expr_start;
-    int result = expr();
+    // Print '=' (ASCII 61)
+    printf(">");
+    for (int i = 0; i < 61; i++) printf("+");
+    printf(".");
+    printf("[-]");
 
-    // monta saída texto “nome=valor”
-    char outtxt[256];
-    snprintf(outtxt, sizeof(outtxt), "%s=%d", varname, result);
+    // Move back to cell 0
+    for (size_t i = 0; i < strlen(variable_name) + 1; i++) printf("<");
 
-    // gera Brainfuck puro
-    int cur_cell = 0;
-    bf_print_string(&cur_cell, outtxt);
-    putchar('\n');
+    // Clear cell 0
+    printf("[-]");
 
+    // Calculate expression into cell 0
+    for (int i = 0; i < term_count; i++) {
+        ExpressionTerm *t = &terms[i];
+        if (t->is_multiplication) {
+            int m1 = t->multiplier, m2 = t->multiplicand;
+
+            // Use cell1 for multiplicand, cell2 for loop temp
+            printf(">");
+            printf("[-]");
+            for (int j = 0; j < m2; j++) printf("+");
+
+            printf(">");
+            printf("[-]");
+
+            // Multiply: loop over multiplicand, add multiplier times to cell0
+            printf("<[>");  // start loop on cell1
+            for (int j = 0; j < m1; j++) {
+                if (t->sign) printf("+"); else printf("-");
+            }
+            printf("<-]>");
+
+            // Clear cell1
+            printf("<[-]");
+            // Back to cell0
+            printf("<");
+        } else {
+            int val = t->value;
+            if (t->sign) {
+                for (int j = 0; j < val; j++) printf("+");
+            } else {
+                for (int j = 0; j < val; j++) printf("-");
+            }
+        }
+    }
+
+    // Convert number to printable digit ('0' + value)
+    printf("++++++++++++++++++++++++++++++++++++++++++++++++"); // +48
+    printf(".");
+
+    printf("\n");
     return 0;
 }
